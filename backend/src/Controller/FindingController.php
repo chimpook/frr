@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Finding;
+use App\Event\FindingEvent;
 use App\Repository\FindingRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -12,6 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 #[Route('/api/findings')]
 class FindingController extends AbstractController
@@ -19,7 +21,8 @@ class FindingController extends AbstractController
     public function __construct(
         private FindingRepository $findingRepository,
         private EntityManagerInterface $entityManager,
-        private ValidatorInterface $validator
+        private ValidatorInterface $validator,
+        private EventDispatcherInterface $eventDispatcher
     ) {}
 
     #[Route('', name: 'findings_list', methods: ['GET'])]
@@ -149,6 +152,12 @@ class FindingController extends AbstractController
 
         $this->findingRepository->save($finding, true);
 
+        $userId = $this->getUser()?->getId() ?? 0;
+        $this->eventDispatcher->dispatch(
+            FindingEvent::created($finding, $userId),
+            FindingEvent::CREATED
+        );
+
         return $this->json($finding->toArray(), Response::HTTP_CREATED);
     }
 
@@ -195,6 +204,12 @@ class FindingController extends AbstractController
 
         $this->entityManager->flush();
 
+        $userId = $this->getUser()?->getId() ?? 0;
+        $this->eventDispatcher->dispatch(
+            FindingEvent::updated($finding, $userId),
+            FindingEvent::UPDATED
+        );
+
         return $this->json($finding->toArray());
     }
 
@@ -207,7 +222,15 @@ class FindingController extends AbstractController
             return $this->json(['error' => 'Finding not found'], Response::HTTP_NOT_FOUND);
         }
 
+        $findingData = $finding->toArray();
+        $userId = $this->getUser()?->getId() ?? 0;
+
         $this->findingRepository->remove($finding, true);
+
+        $this->eventDispatcher->dispatch(
+            FindingEvent::deleted($findingData, $userId),
+            FindingEvent::DELETED
+        );
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }

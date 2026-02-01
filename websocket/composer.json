@@ -1,0 +1,17 @@
+{
+    "name": "fire-risk/websocket-server",
+    "description": "WebSocket server for Fire Risk Findings real-time updates",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "cboden/ratchet": "^0.4.4",
+        "firebase/php-jwt": "^6.10",
+        "clue/redis-react": "^2.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}

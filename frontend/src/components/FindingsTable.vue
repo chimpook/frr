@@ -118,6 +118,7 @@
     :finding="findingDialog.finding"
     :mode="findingDialog.mode"
     @save="handleSave"
+    @update:model-value="handleDialogClose"
   />
 
   <DeleteConfirmDialog
@@ -125,15 +126,25 @@
     :finding="deleteDialog.finding"
     @confirm="handleDelete"
   />
+
+  <EditConflictDialog
+    v-model="conflictDialog.show"
+    :conflict-data="conflictDialog.data"
+    :conflict-type="conflictDialog.type"
+    @discard="handleConflictDiscard"
+    @reload="handleConflictReload"
+    @overwrite="handleConflictOverwrite"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, inject, onMounted } from 'vue';
+import { ref, inject, onMounted, watch } from 'vue';
 import { useFindingsStore } from '@/stores/findings';
 import { findingsApi } from '@/services/api';
 import type { Finding } from '@/types/Finding';
 import FindingDialog from './FindingDialog.vue';
 import DeleteConfirmDialog from './DeleteConfirmDialog.vue';
+import EditConflictDialog from './EditConflictDialog.vue';
 
 const store = useFindingsStore();
 const showSnackbar = inject<(message: string, color?: string) => void>('showSnackbar')!;
@@ -161,6 +172,26 @@ const deleteDialog = ref({
   show: false,
   finding: null as Finding | null,
 });
+
+const conflictDialog = ref({
+  show: false,
+  data: null as Finding | null,
+  type: null as 'updated' | 'deleted' | null,
+});
+
+// Watch for edit conflicts from WebSocket updates
+watch(
+  () => store.editingConflict,
+  (conflict) => {
+    if (conflict && findingDialog.value.show) {
+      conflictDialog.value = {
+        show: true,
+        data: conflict.data,
+        type: conflict.type,
+      };
+    }
+  }
+);
 
 function getRiskColor(risk: string): string {
   switch (risk) {
@@ -207,6 +238,13 @@ function openEditDialog(finding: Finding) {
     finding: { ...finding },
     mode: 'edit',
   };
+  store.setEditingFinding(finding.id);
+}
+
+function handleDialogClose(isOpen: boolean) {
+  if (!isOpen) {
+    store.setEditingFinding(null);
+  }
 }
 
 function openDeleteDialog(finding: Finding) {
@@ -256,6 +294,25 @@ async function toggleResolved(finding: Finding) {
 
 function exportCsv(filters?: { resolved?: boolean; risk_range?: string }) {
   findingsApi.exportToCsv(filters);
+}
+
+// Conflict resolution handlers
+function handleConflictDiscard() {
+  findingDialog.value.show = false;
+  store.setEditingFinding(null);
+  store.clearEditingConflict();
+}
+
+function handleConflictReload(data: Finding) {
+  // Update the dialog with the latest data from server
+  findingDialog.value.finding = { ...data };
+  store.clearEditingConflict();
+}
+
+function handleConflictOverwrite() {
+  // User chose to keep their changes - just close the conflict dialog
+  // The save will proceed with user's current data
+  store.clearEditingConflict();
 }
 
 onMounted(() => {

@@ -7,6 +7,8 @@
       </v-app-bar-title>
 
       <template #append>
+        <WebSocketStatus />
+
         <v-btn
           :to="{ name: 'findings' }"
           variant="text"
@@ -73,13 +75,17 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, provide } from 'vue';
+import { reactive, provide, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useWebSocket } from '@/composables/useWebSocket';
+import { useRealtimeNotifications } from '@/composables/useRealtimeNotifications';
+import WebSocketStatus from '@/components/WebSocketStatus.vue';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const { connect, disconnect } = useWebSocket();
 
 interface Snackbar {
   show: boolean;
@@ -101,7 +107,35 @@ const showSnackbar = (message: string, color: string = 'success') => {
 
 provide('showSnackbar', showSnackbar);
 
+// Initialize realtime notifications after snackbar is available
+const { subscribe: subscribeNotifications, unsubscribe: unsubscribeNotifications } = useRealtimeNotifications();
+
+// Connect WebSocket when authenticated
+watch(
+  () => authStore.token,
+  (token) => {
+    if (token) {
+      connect(token);
+      subscribeNotifications();
+    } else {
+      unsubscribeNotifications();
+      disconnect();
+    }
+  },
+  { immediate: true }
+);
+
+// Also connect on mount if already authenticated
+onMounted(() => {
+  if (authStore.token) {
+    connect(authStore.token);
+    subscribeNotifications();
+  }
+});
+
 function handleLogout() {
+  unsubscribeNotifications();
+  disconnect();
   authStore.logout();
   router.push({ name: 'login' });
 }

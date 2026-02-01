@@ -12,9 +12,11 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build argument for API URL
+# Build argument for API URL and WebSocket URL
 ARG VITE_API_URL=http://localhost:8080
+ARG VITE_WS_URL=ws://localhost:8081
 ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_WS_URL=${VITE_WS_URL}
 
 # Build the application
 RUN npm run build
