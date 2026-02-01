@@ -1,15 +1,58 @@
 <template>
   <v-app>
-    <v-app-bar color="primary" density="comfortable">
+    <v-app-bar v-if="authStore.isAuthenticated" color="primary" density="comfortable">
       <v-app-bar-title>
         <v-icon class="mr-2">mdi-fire</v-icon>
         Fire Risk Findings
       </v-app-bar-title>
+
+      <template #append>
+        <v-btn
+          :to="{ name: 'findings' }"
+          variant="text"
+          :class="{ 'v-btn--active': route.name === 'findings' }"
+        >
+          Findings
+        </v-btn>
+        <v-btn
+          v-if="authStore.isAdmin"
+          :to="{ name: 'users' }"
+          variant="text"
+          :class="{ 'v-btn--active': route.name === 'users' }"
+        >
+          Users
+        </v-btn>
+
+        <v-menu>
+          <template #activator="{ props }">
+            <v-btn icon v-bind="props" class="ml-2">
+              <v-icon>mdi-account-circle</v-icon>
+            </v-btn>
+          </template>
+          <v-list>
+            <v-list-item>
+              <v-list-item-title class="font-weight-bold">
+                {{ authStore.userName }}
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                {{ authStore.userEmail }}
+              </v-list-item-subtitle>
+            </v-list-item>
+            <v-divider />
+            <v-list-item @click="handleLogout">
+              <template #prepend>
+                <v-icon>mdi-logout</v-icon>
+              </template>
+              <v-list-item-title>Logout</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+      </template>
     </v-app-bar>
 
     <v-main>
       <v-container fluid class="pa-4">
-        <FindingsTable />
+        <router-view />
       </v-container>
     </v-main>
 
@@ -31,7 +74,12 @@
 
 <script setup lang="ts">
 import { reactive, provide } from 'vue';
-import FindingsTable from './components/FindingsTable.vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+
+const route = useRoute();
+const router = useRouter();
+const authStore = useAuthStore();
 
 interface Snackbar {
   show: boolean;
@@ -52,6 +100,11 @@ const showSnackbar = (message: string, color: string = 'success') => {
 };
 
 provide('showSnackbar', showSnackbar);
+
+function handleLogout() {
+  authStore.logout();
+  router.push({ name: 'login' });
+}
 </script>
 
 <style>

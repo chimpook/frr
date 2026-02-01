@@ -3,29 +3,19 @@
 namespace App\Tests\Controller;
 
 use App\Entity\Finding;
-use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bundle\FrameworkBundle\KernelBrowser;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
-class FindingControllerTest extends WebTestCase
+class FindingControllerTest extends AuthenticatedTestCase
 {
-    private ?KernelBrowser $client = null;
-    private ?EntityManagerInterface $entityManager = null;
-
     protected function setUp(): void
     {
         parent::setUp();
-        $this->client = static::createClient();
-        $this->entityManager = static::getContainer()->get(EntityManagerInterface::class);
         $this->clearFindings();
     }
 
     protected function tearDown(): void
     {
         $this->clearFindings();
-        $this->entityManager = null;
-        $this->client = null;
         parent::tearDown();
     }
 
@@ -50,11 +40,34 @@ class FindingControllerTest extends WebTestCase
         return $finding;
     }
 
+    // ==================== AUTHENTICATION TESTS ====================
+
+    public function testFindingsRequireAuthentication(): void
+    {
+        $this->requestWithoutAuth('GET', '/api/findings');
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function testFindingsAccessibleWithUserRole(): void
+    {
+        $this->requestWithUserAuth('GET', '/api/findings');
+
+        $this->assertResponseIsSuccessful();
+    }
+
+    public function testFindingsAccessibleWithAdminRole(): void
+    {
+        $this->requestWithAdminAuth('GET', '/api/findings');
+
+        $this->assertResponseIsSuccessful();
+    }
+
     // ==================== LIST TESTS ====================
 
     public function testListFindingsReturnsEmptyArrayWhenNoFindings(): void
     {
-        $this->client->request('GET', '/api/findings');
+        $this->requestWithUserAuth('GET', '/api/findings');
 
         $this->assertResponseIsSuccessful();
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -72,7 +85,7 @@ class FindingControllerTest extends WebTestCase
         $this->createTestFinding(['location' => 'Location 2']);
         $this->createTestFinding(['location' => 'Location 3']);
 
-        $this->client->request('GET', '/api/findings');
+        $this->requestWithUserAuth('GET', '/api/findings');
 
         $this->assertResponseIsSuccessful();
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -90,7 +103,7 @@ class FindingControllerTest extends WebTestCase
             $this->createTestFinding(['location' => "Location $i"]);
         }
 
-        $this->client->request('GET', '/api/findings?page=2&limit=2');
+        $this->requestWithUserAuth('GET', '/api/findings?page=2&limit=2');
 
         $this->assertResponseIsSuccessful();
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -104,7 +117,7 @@ class FindingControllerTest extends WebTestCase
 
     public function testListFindingsReturnsJsonContentType(): void
     {
-        $this->client->request('GET', '/api/findings');
+        $this->requestWithUserAuth('GET', '/api/findings');
 
         $this->assertResponseHeaderSame('content-type', 'application/json');
     }
@@ -120,7 +133,7 @@ class FindingControllerTest extends WebTestCase
             'recommendations' => 'Fix immediately',
         ]);
 
-        $this->client->request('GET', '/api/findings/' . $finding->getId());
+        $this->requestWithUserAuth('GET', '/api/findings/' . $finding->getId());
 
         $this->assertResponseIsSuccessful();
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -135,11 +148,20 @@ class FindingControllerTest extends WebTestCase
 
     public function testShowFindingReturns404ForNonExistentFinding(): void
     {
-        $this->client->request('GET', '/api/findings/NONEXISTENT');
+        $this->requestWithUserAuth('GET', '/api/findings/NONEXISTENT');
 
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('error', $response);
+    }
+
+    public function testShowFindingRequiresAuthentication(): void
+    {
+        $finding = $this->createTestFinding();
+
+        $this->requestWithoutAuth('GET', '/api/findings/' . $finding->getId());
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
     // ==================== CREATE TESTS ====================
@@ -153,14 +175,7 @@ class FindingControllerTest extends WebTestCase
             'recommendations' => 'Monitor situation',
         ];
 
-        $this->client->request(
-            'POST',
-            '/api/findings',
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode($data)
-        );
+        $this->requestWithUserAuth('POST', '/api/findings', $data);
 
         $this->assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -185,11 +200,11 @@ class FindingControllerTest extends WebTestCase
         ];
 
         // Create first finding
-        $this->client->request('POST', '/api/findings', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
+        $this->requestWithUserAuth('POST', '/api/findings', $data);
         $response1 = json_decode($this->client->getResponse()->getContent(), true);
 
         // Create second finding
-        $this->client->request('POST', '/api/findings', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
+        $this->requestWithUserAuth('POST', '/api/findings', $data);
         $response2 = json_decode($this->client->getResponse()->getContent(), true);
 
         $this->assertEquals('SF1', $response1['id']);
@@ -206,7 +221,7 @@ class FindingControllerTest extends WebTestCase
             'resolved' => true,
         ];
 
-        $this->client->request('POST', '/api/findings', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
+        $this->requestWithUserAuth('POST', '/api/findings', $data);
 
         $this->assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -221,7 +236,7 @@ class FindingControllerTest extends WebTestCase
             'recommendations' => 'Recommendations',
         ];
 
-        $this->client->request('POST', '/api/findings', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
+        $this->requestWithUserAuth('POST', '/api/findings', $data);
 
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -237,7 +252,7 @@ class FindingControllerTest extends WebTestCase
             'recommendations' => 'Recommendations',
         ];
 
-        $this->client->request('POST', '/api/findings', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
+        $this->requestWithUserAuth('POST', '/api/findings', $data);
 
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -246,7 +261,17 @@ class FindingControllerTest extends WebTestCase
 
     public function testCreateFindingFailsWithInvalidJson(): void
     {
-        $this->client->request('POST', '/api/findings', [], [], ['CONTENT_TYPE' => 'application/json'], 'invalid json');
+        $this->client->request(
+            'POST',
+            '/api/findings',
+            [],
+            [],
+            [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $this->userToken,
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            'invalid json'
+        );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -265,12 +290,26 @@ class FindingControllerTest extends WebTestCase
                 'recommendations' => 'Recommendations',
             ];
 
-            $this->client->request('POST', '/api/findings', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($data));
+            $this->requestWithUserAuth('POST', '/api/findings', $data);
 
             $this->assertResponseStatusCodeSame(Response::HTTP_CREATED);
             $response = json_decode($this->client->getResponse()->getContent(), true);
             $this->assertEquals($riskRange, $response['risk_range']);
         }
+    }
+
+    public function testCreateFindingRequiresAuthentication(): void
+    {
+        $data = [
+            'location' => 'Location',
+            'risk_range' => 'High',
+            'comment' => 'Comment',
+            'recommendations' => 'Recommendations',
+        ];
+
+        $this->requestWithoutAuth('POST', '/api/findings', $data);
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
     // ==================== UPDATE TESTS ====================
@@ -284,14 +323,7 @@ class FindingControllerTest extends WebTestCase
             'risk_range' => 'High',
         ];
 
-        $this->client->request(
-            'PUT',
-            '/api/findings/' . $finding->getId(),
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode($updateData)
-        );
+        $this->requestWithUserAuth('PUT', '/api/findings/' . $finding->getId(), $updateData);
 
         $this->assertResponseIsSuccessful();
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -309,14 +341,7 @@ class FindingControllerTest extends WebTestCase
 
         $updateData = ['resolved' => true];
 
-        $this->client->request(
-            'PUT',
-            '/api/findings/' . $finding->getId(),
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode($updateData)
-        );
+        $this->requestWithUserAuth('PUT', '/api/findings/' . $finding->getId(), $updateData);
 
         $this->assertResponseIsSuccessful();
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -328,14 +353,7 @@ class FindingControllerTest extends WebTestCase
 
     public function testUpdateFindingReturns404ForNonExistent(): void
     {
-        $this->client->request(
-            'PUT',
-            '/api/findings/NONEXISTENT',
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['location' => 'New'])
-        );
+        $this->requestWithUserAuth('PUT', '/api/findings/NONEXISTENT', ['location' => 'New']);
 
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
@@ -344,14 +362,7 @@ class FindingControllerTest extends WebTestCase
     {
         $finding = $this->createTestFinding(['location' => 'Original']);
 
-        $this->client->request(
-            'PATCH',
-            '/api/findings/' . $finding->getId(),
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['location' => 'Patched'])
-        );
+        $this->requestWithUserAuth('PATCH', '/api/findings/' . $finding->getId(), ['location' => 'Patched']);
 
         $this->assertResponseIsSuccessful();
         $response = json_decode($this->client->getResponse()->getContent(), true);
@@ -366,14 +377,7 @@ class FindingControllerTest extends WebTestCase
         // Wait a moment to ensure timestamp difference
         sleep(1);
 
-        $this->client->request(
-            'PUT',
-            '/api/findings/' . $finding->getId(),
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['resolved' => true])
-        );
+        $this->requestWithUserAuth('PUT', '/api/findings/' . $finding->getId(), ['resolved' => true]);
 
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $newUpdatedAt = new \DateTimeImmutable($response['updated_at']);
@@ -386,16 +390,18 @@ class FindingControllerTest extends WebTestCase
     {
         $finding = $this->createTestFinding();
 
-        $this->client->request(
-            'PUT',
-            '/api/findings/' . $finding->getId(),
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['risk_range' => 'Invalid'])
-        );
+        $this->requestWithUserAuth('PUT', '/api/findings/' . $finding->getId(), ['risk_range' => 'Invalid']);
 
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testUpdateFindingRequiresAuthentication(): void
+    {
+        $finding = $this->createTestFinding();
+
+        $this->requestWithoutAuth('PUT', '/api/findings/' . $finding->getId(), ['location' => 'New']);
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
     // ==================== DELETE TESTS ====================
@@ -405,18 +411,18 @@ class FindingControllerTest extends WebTestCase
         $finding = $this->createTestFinding();
         $findingId = $finding->getId();
 
-        $this->client->request('DELETE', '/api/findings/' . $findingId);
+        $this->requestWithUserAuth('DELETE', '/api/findings/' . $findingId);
 
         $this->assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
 
         // Verify it's actually deleted
-        $this->client->request('GET', '/api/findings/' . $findingId);
+        $this->requestWithUserAuth('GET', '/api/findings/' . $findingId);
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testDeleteFindingReturns404ForNonExistent(): void
     {
-        $this->client->request('DELETE', '/api/findings/NONEXISTENT');
+        $this->requestWithUserAuth('DELETE', '/api/findings/NONEXISTENT');
 
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
@@ -427,19 +433,28 @@ class FindingControllerTest extends WebTestCase
         $finding2 = $this->createTestFinding(['location' => 'Location 2']);
 
         // Verify we have 2 findings
-        $this->client->request('GET', '/api/findings');
+        $this->requestWithUserAuth('GET', '/api/findings');
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertEquals(2, $response['meta']['total']);
 
         // Delete one
-        $this->client->request('DELETE', '/api/findings/' . $finding1->getId());
+        $this->requestWithUserAuth('DELETE', '/api/findings/' . $finding1->getId());
         $this->assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
 
         // Verify we now have 1 finding
-        $this->client->request('GET', '/api/findings');
+        $this->requestWithUserAuth('GET', '/api/findings');
         $response = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertEquals(1, $response['meta']['total']);
         $this->assertEquals($finding2->getId(), $response['data'][0]['id']);
+    }
+
+    public function testDeleteFindingRequiresAuthentication(): void
+    {
+        $finding = $this->createTestFinding();
+
+        $this->requestWithoutAuth('DELETE', '/api/findings/' . $finding->getId());
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
     // ==================== RESPONSE FORMAT TESTS ====================
@@ -454,7 +469,7 @@ class FindingControllerTest extends WebTestCase
             'resolved' => true,
         ]);
 
-        $this->client->request('GET', '/api/findings/' . $finding->getId());
+        $this->requestWithUserAuth('GET', '/api/findings/' . $finding->getId());
         $response = json_decode($this->client->getResponse()->getContent(), true);
 
         $requiredFields = ['id', 'location', 'risk_range', 'comment', 'recommendations', 'resolved', 'created_at', 'updated_at'];
@@ -466,7 +481,7 @@ class FindingControllerTest extends WebTestCase
 
     public function testListResponseContainsCorrectMetaFields(): void
     {
-        $this->client->request('GET', '/api/findings');
+        $this->requestWithUserAuth('GET', '/api/findings');
 
         $response = json_decode($this->client->getResponse()->getContent(), true);
 

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import type { Finding, FindingCreate, FindingUpdate, FindingsResponse } from '@/types/Finding';
 
 const API_URL = process.env.VITE_API_URL || 'http://localhost:8080';
@@ -9,6 +9,38 @@ const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Request interceptor to add JWT token
+apiClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error: AxiosError) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle 401 errors
+apiClient.interceptors.response.use(
+  (response: AxiosResponse) => {
+    return response;
+  },
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      // Clear token and redirect to login
+      localStorage.removeItem('token');
+      // Only redirect if not already on login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const findingsApi = {
   async getAll(page: number = 1, limit: number = 10): Promise<FindingsResponse> {
@@ -42,7 +74,7 @@ export const findingsApi = {
     return response.data;
   },
 
-  getExportUrl(filters?: { resolved?: boolean; risk_range?: string }): string {
+  async exportToCsv(filters?: { resolved?: boolean; risk_range?: string }): Promise<void> {
     const params = new URLSearchParams();
     if (filters?.resolved !== undefined) {
       params.append('resolved', filters.resolved.toString());
@@ -51,12 +83,22 @@ export const findingsApi = {
       params.append('risk_range', filters.risk_range);
     }
     const queryString = params.toString();
-    return `${API_URL}/api/findings/export${queryString ? '?' + queryString : ''}`;
-  },
+    const url = `/findings/export${queryString ? '?' + queryString : ''}`;
 
-  exportToCsv(filters?: { resolved?: boolean; risk_range?: string }): void {
-    const url = this.getExportUrl(filters);
-    window.open(url, '_blank');
+    const response = await apiClient.get(url, {
+      responseType: 'blob',
+    });
+
+    // Create a blob URL and trigger download
+    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', `fire_risk_findings_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(downloadUrl);
   },
 };
 

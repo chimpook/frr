@@ -254,6 +254,10 @@ async function toggleResolved(finding: Finding) {
   }
 }
 
+function exportCsv(filters?: { resolved?: boolean; risk_range?: string }) {
+  findingsApi.exportToCsv(filters);
+}
+
 onMounted(() => {
   loadItems({ page: 1, itemsPerPage: 10 });
 });
