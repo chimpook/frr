@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  database:
+    image: mariadb:11
+    container_name: fire_risk_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_DATABASE:-fire_risk}
+      MYSQL_USER: ${DB_USER:-fire_risk_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-fire_risk_password}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - fire_risk_network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fire_risk_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: ${APP_ENV:-prod}
+      APP_SECRET: ${APP_SECRET:-changethissecretkey123456789}
+      DATABASE_URL: mysql://${DB_USER:-fire_risk_user}:${DB_PASSWORD:-fire_risk_password}@database:3306/${DB_DATABASE:-fire_risk}?serverVersion=11.0.0-MariaDB
+    volumes:
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - fire_risk_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    container_name: fire_risk_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - fire_risk_network
+
+networks:
+  fire_risk_network:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+  backend_vendor:
