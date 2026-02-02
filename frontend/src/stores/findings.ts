@@ -132,18 +132,17 @@ export const useFindingsStore = defineStore('findings', () => {
   function handleRemoteUpdate(finding: Finding): void {
     const index = findings.value.findIndex((f) => f.id === finding.id);
 
-    // Check if user is currently editing this finding
+    // Always update in list if present
+    if (index !== -1) {
+      findings.value[index] = finding;
+    }
+
+    // Also show conflict dialog if user is currently editing this finding
     if (editingFindingId.value === finding.id) {
       editingConflict.value = {
         type: 'updated',
         data: finding,
       };
-      return;
-    }
-
-    // Update in list if present
-    if (index !== -1) {
-      findings.value[index] = finding;
     }
   }
 
