@@ -28,9 +28,12 @@ class JwtAuthenticator
 
             $decoded = JWT::decode($token, new Key($this->publicKey, 'RS256'));
 
+            // Lexik JWT uses 'username' as identifier, not 'sub'
+            $username = $decoded->username ?? null;
+
             return [
-                'userId' => $decoded->sub ?? null,
-                'email' => $decoded->username ?? null,
+                'userId' => $decoded->sub ?? $username,
+                'email' => $username,
                 'roles' => $decoded->roles ?? [],
             ];
         } catch (\Exception $e) {
