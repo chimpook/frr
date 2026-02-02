@@ -152,9 +152,9 @@ class FindingController extends AbstractController
 
         $this->findingRepository->save($finding, true);
 
-        $userId = $this->getUser()?->getId() ?? 0;
+        $userIdentifier = $this->getUser()?->getUserIdentifier() ?? '';
         $this->eventDispatcher->dispatch(
-            FindingEvent::created($finding, $userId),
+            FindingEvent::created($finding, $userIdentifier),
             FindingEvent::CREATED
         );
 
@@ -204,9 +204,9 @@ class FindingController extends AbstractController
 
         $this->entityManager->flush();
 
-        $userId = $this->getUser()?->getId() ?? 0;
+        $userIdentifier = $this->getUser()?->getUserIdentifier() ?? '';
         $this->eventDispatcher->dispatch(
-            FindingEvent::updated($finding, $userId),
+            FindingEvent::updated($finding, $userIdentifier),
             FindingEvent::UPDATED
         );
 
@@ -223,12 +223,12 @@ class FindingController extends AbstractController
         }
 
         $findingData = $finding->toArray();
-        $userId = $this->getUser()?->getId() ?? 0;
+        $userIdentifier = $this->getUser()?->getUserIdentifier() ?? '';
 
         $this->findingRepository->remove($finding, true);
 
         $this->eventDispatcher->dispatch(
-            FindingEvent::deleted($findingData, $userId),
+            FindingEvent::deleted($findingData, $userIdentifier),
             FindingEvent::DELETED
         );
 
