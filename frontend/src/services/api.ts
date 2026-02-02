@@ -1,7 +1,19 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import type { Finding, FindingCreate, FindingUpdate, FindingsResponse } from '@/types/Finding';
 
-const API_URL = process.env.VITE_API_URL || 'http://localhost:8080';
+// Dynamically detect API URL based on current browser location
+function getApiUrl(): string {
+  // If explicitly configured, use that
+  if (process.env.VITE_API_URL) {
+    return process.env.VITE_API_URL;
+  }
+  // Otherwise, use the same host as the frontend with API port
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  return `${protocol}//${hostname}:8080`;
+}
+
+const API_URL = getApiUrl();
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: `${API_URL}/api`,

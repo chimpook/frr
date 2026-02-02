@@ -1,7 +1,19 @@
 import { ref, computed, readonly } from 'vue';
 import type { WebSocketStatus, WebSocketIncomingMessage, FindingWebSocketMessage } from '@/types/WebSocket';
 
-const WS_URL = process.env.VITE_WS_URL || 'ws://localhost:8081';
+// Dynamically detect WebSocket URL based on current browser location
+function getWsUrl(): string {
+  // If explicitly configured, use that
+  if (process.env.VITE_WS_URL) {
+    return process.env.VITE_WS_URL;
+  }
+  // Otherwise, use the same host as the frontend with WebSocket port
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const hostname = window.location.hostname;
+  return `${wsProtocol}//${hostname}:8081`;
+}
+
+const WS_URL = getWsUrl();
 
 // Singleton state
 let ws: WebSocket | null = null;

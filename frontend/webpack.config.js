@@ -81,8 +81,10 @@ module.exports = (env, argv) => {
         __VUE_OPTIONS_API__: true,
         __VUE_PROD_DEVTOOLS__: false,
         __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
-        'process.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'http://localhost:8080'),
-        'process.env.VITE_WS_URL': JSON.stringify(process.env.VITE_WS_URL || 'ws://localhost:8081'),
+        // Use empty string to trigger dynamic host detection at runtime
+        // Set VITE_API_URL/VITE_WS_URL environment variables to override
+        'process.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || ''),
+        'process.env.VITE_WS_URL': JSON.stringify(process.env.VITE_WS_URL || ''),
       }),
       ...(isProduction
         ? [
