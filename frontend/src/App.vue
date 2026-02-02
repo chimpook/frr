@@ -3,7 +3,7 @@
     <v-app-bar v-if="authStore.isAuthenticated" color="primary" density="comfortable">
       <v-app-bar-title>
         <v-icon class="mr-2">mdi-fire</v-icon>
-        Fire Risk Findings
+        Fire Risk Register
       </v-app-bar-title>
 
       <template #append>
